@@ -88,10 +88,6 @@ As we saw in AWS EMR similarly here you store your data in google bucket and giv
  
 
 
-GitHub Link:
-https://github.com/enamshah09/DeltaComparisonOfContainers 
-Please find all the test details tables and graphs in Final Graphs Sheet and Cluster Final Graph Sheet attached in the zip file.
-
-
+Please find all the test details tables and graphs in Final Graphs Sheet and Cluster Final Graph Sheet.
 .
 				
