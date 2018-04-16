@@ -1,93 +1,82 @@
-# ComparisionOfContainers
-Steps to execute Hadoop Benchmarks on Google Cloud and Amazon EC2
-
-Step 1.	Create Container Cluster on google cloud platform
-Step 2.	The following fields are required:
-Name: The name of this container cluster. It must be unique within the project and the zone.
-Zone: Select the zone in which you want to create the container cluster 
-Cluster size: The number of instances to include in this container cluster. We had created as single instance for single node cluster so therefore the cluster size was one. We created one master node and two slave nodes for multi-node cluster 
-Machine Type: The Google Compute Engine machine type to use for instances in this container cluster. We used machine type n1-standard-4 (Standard 4 CPU machine type with 4 virtual CPUs and 15 GB of memory) for master node in both single node cluster and multi-node cluster. We used machine type n1-standard-2 (Standard 2 CPU machine type with 2 virtual CPUs and 7.5 GB of memory) for slave node.
-	
-Command for creating the cluster:
-gcloud container clusters create NAME --zone ZONE \   --num-nodes=1 --machine-type=n1-standard-4 --local-ssd-count=1
-Hadoop Benchmark Execution Commands
-Single Node and Multi Node Cluster.
-Step 3.	After creating the cluster ssh into the cluster 
-Step 4.	As Docker is pre-installed in google cluster, We will install and run Hadoop in the docker
-Step 5.	We pulled the Hadoop 2.7.1 docker image by the following command
-sudo docker sequenceiq/hadoop-docker:2.7.1pull
-Step 6.	To check whether the hadoop docket image got downloaded correctly. 
-docker images
-Step 7.	Now we will run Hadoop 2.7.1 in docker 
-docker run -it –p 50070:50070 sequenceiq/hadoop-docker:2.7.1 /etc/bootstrap.sh -bash
-Step 8.	Now we will go Hadoop directory by the command given below and execute the                                various benchmark
-
-TestDFSIO Benchmark
-Write
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -write -nrFiles 8 -fileSize 1000
-Read
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -read -nrFiles 8 -fileSize 1000
-Clean
-bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -clean
-
-NameNode(NN) Benchmark
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar nnbench -operation open_read \
-   -maps 12 -reduces 6 -blockSize 1 -bytesToWrite 1000 -numberOfFiles 1000 \-replicationFactorPerFile 16 -readFileAfterOpen true \
-   -baseDir /benchmarks/NNBench-`hostname -s`
-
-MapReduce Benchmark
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar mrbench -numRuns 25
-
-TeraSort Benchmark
-TeraGen
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar teragen 200000000 /benchmark/terasort-input
-Tera Sort
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar terasort /benchmark/terasort-input /benchmark/terasort-output
-Tera Validate
-time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar teravalidate /benchmark/terasort-output /benchmark/terasort-validate
-
-
-Word Count
-
-Step 1.  Create java file for WordCount program
-Step 2.  bash-4.1# export JAVA_HOME=/usr/java/default 
- bash-4.1#export PATH=${JAVA_HOME}/bin:${PATH}
-export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
-	Step 3.  Compile java file and create a jar file 
-bash-4.1# bin/hadoop com.sun.tools.javac.Main WordCount.java 
-bash-4.1# jar cf wc.jar WordCount*.class
-	Step 4.  Take the input files using wget command and move them to input files
-	
-Step 5.    Run the WordCount.java program
-  		bash-4.1# time bin/hadoop jar wc.jar WordCount cloud/inputs cloud/output
-			  
-   		
-In Amazon EMR after you create a cluster of your configuration you can add steps to run various jobs.
-
-
-
-
-
-you store all your data in S3 and you can mention the path of your bucket to access.
-•	select Custom Jar
-•	Give name to the step
-•	Give your jar path, which is located in S3 bucket
-•	 you can give appropriate arguments next
-
-
-
-
-In Google DataProc after you create a cluster of your configuration there you can add various jobs.
-
-  
+# Comparison of Containers - Google Cloud and Amazon EC2
+The purpose of this repo is to compare and analyze containers of different cloud providers by using different MapReduce Benchmarks in Hadoop.
+## Steps
+### 1. Running Hadoop Benchmarks
+We will conduct experiments using different MapReduce benchmarks to stress Hadoop clusters over distinct situations on the container-based virtualization systems. The Distribution of Hadoop provides number of Benchmarks, which are bundled in `hadoop-*test*.jar` and `hadoop-*examples*.jar`. The approach we took to do this is by conducting experiments on two well known evaluation perspectives `Micro Benchmark` and `Macro Benchmark`.
+#### Micro Benchmark
+Micro-benchmark is used to test the basic components of the Hadoop system. By micro-benchmarks it is possible to measure the performance of basic components before evaluating the system as a whole. Various Micro-benchmarks that we implemented are `TestDFSIO`, `NameNode` and `MapReduce`
+##### TestDFSIO Benchmark
+The TestDFSIO is a read and write test for HDFS. It uses one map task per file. It gives an idea of how fast the cluster is terms of I/O. Helpful in stress testing HDFS. It discovers network performance bottleneck. Default output directory is `/benchmarks/TestDFSIO`.
+Note: Run write test before read test as the TestDFSIO read benchmark doesn't generate its own input files.
+###### TestDFSIO write test
+```
+$ time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -write -nrFiles N -fileSize MB
+```
+###### TestDFSIO read test
+```
+$ time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -read -nrFiles N -fileSize MB
+```
+###### Remove and clean the test data
+```
+$ bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar TestDFSIO -clean
+```
+##### NameNode(NN) Benchmark
+In order to analyse the behaviour of NameNode component while dealing with huge amount of HDFS – related requests we choose NN Benchmark. NN Benchmark generates a lot of HDFS-related requests with normally very small “payloads” for the sole purpose of putting a high HDFS management stress on the NameNode. This benchmark is considered to be the load test for HDFS files where we create, write, open, read and delete files.
+Note: Run create_write test before open_read, rename, delete test as the NN benchmark doesn't generate its own input files.
+```
+$ bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar nnbench \ 
+-operation <create_write | open_read | rename | delete> -maps <No. of maps. Default=1. Not mandatory> \ 
+-reduces <No. of reduces. Default=1. Not mandatory> -blockSize <Block size in bytes. Default=1. Not mandatory> \ 
+-bytesToWrite <Default=0. Not mandatory> -numberOfFiles <No. of files to create. Default=1. Not mandatory> \ 
+-replicationFactorPerFile <Default=1. Not mandatory> -baseDir <Base DFS path. Default=/becnhmarks/NNBench> \ 
+-readFileAfterOpen<Boolean (true of false)>
+```
+Eg. 
+```
+bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar nnbench \ 
+-operation create_write -maps 12 -reduces 6 -blockSize 1 -bytesToWrite 0 -numberOfFiles 1000 \ 
+-replicationFactorPerFile 3 -readFileAfterOpen true -baseDir /benchmarks/NNBench-`hostname -s`
+```
+##### MapReduce(MR) Benchmark
+MapReduce Benchmark loops a small job a number of times. This benchmark stresses the MR layer to identify how efficiently it works while dealing with enormous job requests. MRBench checks whether small job runs are responsive and running efficiently on your cluster. It puts its focus on the MapReduce layer as its impact on the HDFS layer is very limited.
+```
+$ time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.7.1.jar mrbench -numRuns N
+```
+#### Macro Benchmark
+Macro-benchmarks stress out numerous segments of a framework and can typically give more critical outcomes, as it certainly incorporates the segments before assessed by small scale benchmarks. Various Macro-benchmarks that we implemented are `TeraSort` and `WordCount`
+##### TeraSort Benchmark
+The goal of this benchmark is to sort any amount of data as fast as possible. It is a benchmark that combines testing the HDFS and MapReduce layers of an Hadoop cluster. Terasort is the well-known benchmark to identify how fast a Hadoop cluster is.
+A full TeraSort benchmark run consists of the following three steps:
+- Generate I/p via `TeraGen`
+```
+$ time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar teragen <number of 100-byte rows> <output dir>
+```
+- Running TeraSort in I/p generated
+```
+$ time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar terasort <input dir> <output dir>
+```
+- Validate the sorted data obtained from the above step
+```
+time bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.1.jar teravalidate <terasort output dir (= input data)> <teravalidate output dir>
+```
+### 2. Setup WordCount
+* Create java file for WordCount program [WordCount.java](https://hadoop.apache.org/docs/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html#Source_Code)
+* Setup Environment variables and export path
+```
+$ export JAVA_HOME=/usr/java/default
+$ export PATH=${JAVA_HOME}/bin:${PATH}
+$ export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+```
+* Compile `Word count` java file and create a jar file
+```
+$ bin/hadoop com.sun.tools.javac.Main WordCount.java
+$ jar cf wc.jar WordCount*.class
+```
+* Take the input files using wget command and move them to a directory where you have all the input files. [Sample Input Files](http://mattmahoney.net/dc/textdata.html)
+* Run WordCount.java and also specify the path for input files and output files
+```
+$ time bin/hadoop jar wc.jar WordCount /path-to-input-file /path-to-output-file
+```
 
 
 
-
-As we saw in AWS EMR similarly here you store your data in google bucket and give the appropriate path in jar file and give the Main class and arguments required to run.
- 
-
-
-Please find all the test details tables and graphs in Final Graphs Sheet and Cluster Final Graph Sheet.
-.
-				
